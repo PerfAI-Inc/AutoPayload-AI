@@ -1,30 +1,57 @@
 import { chromium } from "playwright";
+import { createStorageService, generateArtifactUUID } from "./storage";
+import fs from "fs/promises";
 
 (async () => {
   console.log("🎬  Launching browser…");
+  
+  const storage = createStorageService();
+  await storage.ensureBucketExists?.();
+  
+  const uuid = generateArtifactUUID();
+  console.log(`📦  Artifact UUID: ${uuid}`);
+  
   const browser = await chromium.launch({ headless: true });
 
   const context = await browser.newContext({
-    // optional: still record HAR at the same time
-    recordHar: { path: "network.har", mode: "full" },
+    recordHar: { path: `temp-${uuid}.har`, mode: "full" },
   });
 
-  // 1️⃣  Start tracing
   await context.tracing.start({
     screenshots: true,
     snapshots: true,
-    sources: true, // include source code in the viewer
+    sources: true,
     title: "PerfAI.ai walk-through",
   });
 
   const page = await context.newPage();
   await page.goto("https://perfai.ai/");
-  await page.screenshot({ path: "screenshot.png", fullPage: true });
+  
+  await page.screenshot({ path: `temp-${uuid}.png`, fullPage: true });
+  
+  const domContent = await page.content();
+  await fs.writeFile(`temp-${uuid}.html`, domContent);
 
-  // 2️⃣  Stop tracing and save the archive
-  await context.tracing.stop({ path: "trace.zip" });
+  await context.tracing.stop({ path: `temp-${uuid}.zip` });
 
   await context.close();
   await browser.close();
-  console.log("✅  Done – trace.zip created");
+
+  console.log("📁  Storing artifacts…");
+  
+  const snapshotPath = await storage.uploadSnapshot(`temp-${uuid}.png`, uuid);
+  const domPath = await storage.uploadDOM(`temp-${uuid}.html`, uuid);
+  const harPath = await storage.uploadHAR(`temp-${uuid}.har`, uuid);
+  const tracePath = await storage.uploadTrace(`temp-${uuid}.zip`, uuid);
+
+  await fs.unlink(`temp-${uuid}.png`);
+  await fs.unlink(`temp-${uuid}.html`);
+  await fs.unlink(`temp-${uuid}.har`);
+  await fs.unlink(`temp-${uuid}.zip`);
+
+  console.log("✅  Done – artifacts stored:");
+  console.log(`   📸  Snapshot: ${snapshotPath}`);
+  console.log(`   🌐  DOM: ${domPath}`);
+  console.log(`   🌍  HAR: ${harPath}`);
+  console.log(`   📊  Trace: ${tracePath}`);
 })();
