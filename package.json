@@ -1,16 +1,19 @@
 {
+  "type": "module",
   "name": "autopayload-ai",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
     "build": "tsc --noEmit",
-    "dev": "nodemon --exec ts-node src/index.ts"
+    "dev": "nodemon --exec node --loader ts-node/esm src/index.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "devDependencies": {
+    "@playwright/test": "^1.54.1",
+    "@types/node": "^24.1.0",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
